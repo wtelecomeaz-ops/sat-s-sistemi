@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="az">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Müştəri qeydiyyatı</title>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+<style>
+:root{--bg:#F4F1EA;--card:#FFFFFF;--ink:#1B1F23;--mute:#6B7078;--line:#E3DED3;--acc:#0F766E;--acc2:#E8F5F2;--warn:#B42318;--ok:#067647}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px 16px 120px}
+header{display:flex;align-items:center;justify-content:space-between;margin:4px 0 16px}
+h1{font-size:22px;letter-spacing:-.3px}
+.gear{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px 12px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--mute);margin-bottom:12px}
+label{display:block;font-size:14px;color:var(--mute);margin:10px 0 6px}
+input,select,textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px;font:inherit;background:#FCFBF8;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
+.auto{border-color:#E8A33D!important;background:#FFF7E8!important}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.imei{display:flex;gap:8px;align-items:stretch}
+.imei input{font-family:ui-monospace,Menlo,monospace;letter-spacing:1px}
+.scan{flex:0 0 auto;border:0;border-radius:12px;background:var(--acc);color:#fff;padding:0 16px;font-weight:600;font-size:15px}
+.hint{font-size:13px;margin-top:6px;min-height:18px}
+.hint.ok{color:var(--ok)}.hint.bad{color:var(--warn)}
+.submit{position:fixed;left:16px;right:16px;bottom:16px;border:0;border-radius:16px;background:var(--ink);color:#fff;font-size:17px;font-weight:700;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.submit:disabled{opacity:.5}
+#cam{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:10}
+#cam.on{display:flex}
+#cam video{flex:1;width:100%;object-fit:cover}
+.frame{position:absolute;left:8%;right:8%;top:38%;height:18%;border:3px solid #fff;border-radius:16px;box-shadow:0 0 0 999px rgba(0,0,0,.45)}
+.camtxt{position:absolute;top:calc(38% - 56px);left:0;right:0;text-align:center;color:#fff;font-weight:600}
+.close{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);border:0;border-radius:99px;background:#fff;padding:14px 28px;font-weight:700;font-size:16px}
+.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:15px;display:none;z-index:20;max-width:90%}
+.hist div{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding:10px 0;font-size:14px}
+.hist div:first-child{border-top:0}
+.hist small{color:var(--mute)}
+.state{font-size:12px;border-radius:99px;padding:2px 8px;background:var(--acc2);color:var(--acc);align-self:center}
+#satNom{background:var(--acc2);color:var(--acc);font-weight:600;font-size:14px;padding:12px 8px}
+.state.err{background:#FEE4E2;color:var(--warn)}
+#settings{display:none}
+.ids{display:flex;gap:10px}
+.idslot{flex:1;max-width:100%;aspect-ratio:1.586;border:1.5px dashed var(--acc);border-radius:12px;background:var(--acc2);color:var(--acc);font:inherit;font-size:14px;font-weight:600;position:relative;overflow:hidden}
+.idslot img{display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.idslot.has{border-style:solid}.idslot.has img{display:block}.idslot.has span{display:none}
+#idcam,#idprev{position:fixed;inset:0;background:#000;display:none;z-index:15}
+#idcam.on,#idprev.on{display:block}
+#idcam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.idframe{position:absolute;left:6%;width:88%;aspect-ratio:1.586;top:50%;transform:translateY(-50%);border:3px solid #fff;border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.5)}
+#idcam.qutu .idframe{left:12%;width:76%;aspect-ratio:.66;top:52%;max-height:62vh;border-radius:14px}
+#idcam.qutu .camtxt{bottom:auto;top:calc(52% - 31vh - 64px);padding:0 24px;font-size:15px}
+.idmode{position:absolute;top:18px;left:50%;transform:translateX(-50%);display:flex;background:rgba(0,0,0,.55);border-radius:99px;padding:4px;gap:4px}
+.idmode button{white-space:nowrap;border:0;background:none;color:#fff;font:inherit;font-size:14px;padding:8px 14px;border-radius:99px}
+.idmode button.on{background:#fff;color:#000;font-weight:700}
+#idcam .camtxt{top:auto;bottom:calc(50% + 30vw + 24px)}
+.idbar{position:absolute;bottom:28px;left:0;right:0;display:flex;justify-content:space-around;align-items:center}
+.idbar button:not(.shutter){border:0;background:rgba(255,255,255,.18);color:#fff;border-radius:99px;padding:10px 12px;font:inherit;min-width:72px;font-size:14px;white-space:nowrap}
+.shutter{width:76px;height:76px;border-radius:50%;border:5px solid #fff;background:#fff;box-shadow:inset 0 0 0 4px #000}
+.shutter:disabled{opacity:.5}
+#idprev{background:#111;color:#fff;padding:24px 16px;display:none;flex-direction:column;gap:14px}
+#idprev.on{display:flex}
+.ptitle{font-weight:700;font-size:18px;text-align:center}
+#idout{width:100%;height:auto;max-height:62vh;object-fit:contain;border-radius:14px;background:#222}
+.pnote{text-align:center;font-size:14px;color:#BFC5CC;min-height:20px}
+.pbar{display:flex;gap:10px;margin-top:auto}
+.pbar button{flex:1;border:0;border-radius:14px;padding:16px;font:inherit;font-weight:700;font-size:16px;background:#2A2D31;color:#fff}
+.pbar .okb{background:var(--acc)}
+#share{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;z-index:18}
+#share.on{display:flex}
+.sbox{background:var(--card);width:100%;border-radius:22px 22px 0 0;padding:20px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.sbox img{width:100%;max-height:40vh;border-radius:12px;object-fit:contain;background:#F4F1EA}
+.wabtn{border:0;border-radius:14px;background:#1FA855;color:#fff;font:inherit;font-weight:700;font-size:17px;padding:16px}
+.later{border:0;background:none;color:var(--mute);font:inherit;padding:6px}
+.quick{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.quick button{flex:1;border:1.5px solid var(--line);background:#FCFBF8;border-radius:10px;padding:8px 4px;font:inherit;font-size:14px;color:var(--ink)}
+.cal{display:none;margin-top:10px;border:1.5px solid var(--line);border-radius:14px;padding:10px}
+.cal.on{display:block}
+.cal .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:700}
+.cal .top button{border:0;background:var(--acc2);color:var(--acc);border-radius:10px;width:38px;height:34px;font-size:18px}
+.cal .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .wd{font-size:12px;color:var(--mute);padding:4px 0}
+.cal .d{border:0;background:none;border-radius:10px;padding:9px 0;font:inherit;font-size:15px;color:var(--ink)}
+.cal .d.today{outline:1.5px solid var(--acc)}
+.cal .d.sel{background:var(--acc);color:#fff}
+.cal .d.past{color:#B8B4AA}
+</style>
+</head>
+<body>
+<header><h1>Müştəri qeydiyyatı</h1><button class="gear" id="gearBtn">⚙ Ayarlar</button></header>
+
+<div class="card" id="settings">
+  <h2>Ayarlar (bir dəfə)</h2>
+  <label>Google Sheets linki (Apps Script URL)</label>
+  <input id="url" placeholder="https://script.google.com/macros/s/.../exec">
+  <label>Gizli açar</label>
+  <input id="key" placeholder="Apps Script-dəki ilə eyni olsun">
+  <label>WhatsApp nömrəsi (boş qalsa, qrupu özün seçirsən)</label>
+  <input id="wa" inputmode="tel" placeholder="994501234567">
+  <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="waOn" style="width:auto"> Göndərəndən sonra WhatsApp-ı aç</label>
+  <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="waFin" style="width:auto"> Mesaja FİN-i də əlavə et</label>
+  <button class="scan" style="margin-top:12px;padding:12px 16px" id="saveSet">Yadda saxla</button>
+</div>
+
+<form id="f" autocomplete="off">
+<div class="card">
+  <h2>Satıcı</h2>
+  <select id="satSec" name="satici" required><option value="">Seç...</option></select>
+  <input type="hidden" id="satNom" name="saticinomre">
+</div>
+<div class="card">
+  <h2>1 şəkil — xanalar özü dolur</h2>
+  <div class="hint" id="h_ocr" style="margin-bottom:6px"></div>
+  <div class="ids">
+    <button type="button" class="idslot" data-side="on"><img alt=""><span>📷 Vəsiqəni çək (qutunun üstündə)</span></button>
+  </div>
+  <div class="hint" style="color:var(--mute)">Vəsiqəni qutunun arxasına qoy və çək: model, IMEI, ad və FİN avtomatik yazılacaq.</div>
+</div>
+<div class="card">
+  <h2>Məhsul</h2>
+  <label>Məhsulun adı</label>
+  <input name="mehsul" required placeholder="iPhone 18 Pro Max 256GB">
+  <label>Model kodu</label><input name="modelkod" id="modelkod" placeholder="MFAB4LL/A · A3524" style="text-transform:uppercase">
+  <label>SIM növü</label><select name="sim" id="sim"><option value="">—</option><option>Nano SIM + eSIM</option><option>Yalnız eSIM</option><option>2 nano SIM</option></select>
+  <div class="hint" id="h_sim"></div>
+  <label>IMEI 1</label>
+  <div class="imei"><input name="imei1" id="imei1" inputmode="numeric" maxlength="15" required placeholder="15 rəqəm"><button type="button" class="scan" data-t="imei1">📷 Skan</button></div>
+  <div class="hint" id="h_imei1"></div>
+  <label>IMEI 2 (varsa)</label>
+  <div class="imei"><input name="imei2" id="imei2" inputmode="numeric" maxlength="15" placeholder="15 rəqəm"><button type="button" class="scan" data-t="imei2">📷 Skan</button></div>
+  <div class="hint" id="h_imei2"></div>
+</div>
+
+<div class="card">
+  <h2>Müştəri</h2>
+  <label>Ad, soyad</label>
+  <input name="ad" required>
+  <label>Mobil nömrə</label>
+  <input name="nomre" id="nomre" inputmode="tel" required value="+994 " placeholder="+994 50 123 45 67">
+  <label>FİN kod</label>
+  <input name="fin" maxlength="7" style="text-transform:uppercase" placeholder="7 simvol">
+
+</div>
+
+<div class="card">
+  <h2>Ödəniş</h2>
+  <div class="row">
+    <div><label>Ödəniş növü</label>
+      <select name="odenis"><option>Nağd</option><option>TamKart (ABB)</option><option>BirKart</option><option>ABB Daxili</option><option>BirBank Daxili</option><option>BolKart</option><option>Ukart</option><option>LeoKart</option></select></div>
+    <div><label>Müddət (ay)</label>
+      <select name="muddet"><option>—</option><option>2</option><option>3</option><option>6</option><option>9</option><option>12</option><option>18</option><option>24</option><option>35</option></select></div>
+  </div>
+  <label>Qiymət (₼)</label>
+  <input name="qiymet" inputmode="decimal">
+  <label>Qeyd</label>
+  <textarea name="qeyd" rows="2"></textarea>
+</div>
+
+<div class="card" id="borcCard">
+  <h2>Borc</h2>
+  <label style="display:flex;gap:10px;align-items:center;color:var(--ink)"><input type="checkbox" id="borcVar" name="borcvar" value="Bəli" style="width:auto"> Müştərinin borcu var</label>
+  <div id="borcSah" style="display:none">
+    <div class="row">
+      <div><label>Ödədiyi məbləğ (₼)</label><input name="odenen" id="odenen" inputmode="decimal"></div>
+      <div><label>Qalan borc (₼)</label><input name="borc" id="borc" inputmode="decimal"></div>
+    </div>
+    <label>Borcu nə vaxt ödəyəcək</label>
+    <input id="borcGoster" readonly placeholder="Tarixi seç" style="cursor:pointer">
+    <input type="hidden" name="borctarix" id="borctarix">
+    <div class="quick"><button type="button" data-d="7">1 həftə</button><button type="button" data-d="14">2 həftə</button><button type="button" data-m="1">1 ay</button><button type="button" data-m="2">2 ay</button></div>
+    <div class="cal" id="cal"></div>
+    <div class="hint" id="h_borc"></div>
+    <label>Borc qeydi</label>
+    <input name="borcqeyd" placeholder="Məsələn: maaş günü ödəyəcək">
+  </div>
+</div>
+
+<div class="card hist"><h2>Son göndərilənlər (bu telefonda)</h2><div id="hist"><small>Hələ heç nə yoxdur</small></div></div>
+<button class="submit" id="sub" type="submit">Cədvələ göndər</button>
+</form>
+
+<div id="cam"><video id="vid" playsinline muted></video><div class="frame"></div><div class="camtxt">Barkodu çərçivəyə gətir</div><button class="close" id="camClose">Bağla</button></div>
+<div id="idcam"><video id="idvid" playsinline muted></video><div class="idframe" id="idframe"></div>
+  <div class="idmode"><button type="button" data-m="qutu">Qutu + vəsiqə</button><button type="button" data-m="kart">Yalnız vəsiqə</button></div>
+  <div class="camtxt" id="idtxt">Vəsiqəni çərçivənin içinə qoy</div>
+  <div class="idbar"><button type="button" id="idClose">Bağla</button><button type="button" class="shutter" id="idShot" aria-label="Şəkil çək"></button><button type="button" id="idGal">🖼 Qalereya</button><input type="file" id="idFile" accept="image/*" hidden></div>
+</div>
+<div id="idprev"><div class="ptitle" id="ptitle">Vəsiqə</div><canvas id="idout"></canvas><div class="pnote" id="pnote"></div>
+  <div class="pbar"><button type="button" id="idRetry">Yenidən çək</button><button type="button" class="okb" id="idOk">Təsdiqlə</button></div>
+</div>
+<div id="share"><div class="sbox">
+  <div class="ptitle" style="color:var(--ink)">✓ Cədvələ yazıldı</div>
+  <img id="shareImg" alt="">
+  <div class="pnote" style="color:var(--mute)">Vəsiqə şəkli və altında bütün məlumat WhatsApp-a göndəriləcək</div>
+  <button type="button" class="wabtn" id="shareGo">WhatsApp-a göndər</button>
+  <button type="button" class="later" id="shareNo">Göndərmə</button>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+function toast(t, ms = 2500) { const el = $("#toast"); el.textContent = t; el.style.display = "block"; clearTimeout(el._t); el._t = setTimeout(() => el.style.display = "none", ms); }
+
+// IMEI yoxlaması (Luhn alqoritmi)
+function luhn(s) {
+  if (!/^\d{15}$/.test(s)) return false;
+  let sum = 0;
+  for (let i = 0; i < 15; i++) { let d = +s[i]; if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; } sum += d; }
+  return sum % 10 === 0;
+}
+function checkImei(id) {
+  const v = $("#" + id).value.trim(), h = $("#h_" + id);
+  if (!v) { h.textContent = ""; h.className = "hint"; return true; }
+  if (luhn(v)) { h.textContent = "✓ IMEI düzgündür"; h.className = "hint ok"; return true; }
+  h.textContent = v.length < 15 ? `${v.length}/15 rəqəm` : "✗ Bu IMEI düzgün deyil, yenidən yoxla"; h.className = "hint bad"; return false;
+}
+["imei1", "imei2"].forEach((id) => $("#" + id).addEventListener("input", (e) => { e.target.value = e.target.value.replace(/\D/g, ""); checkImei(id); }));
+
+// Kamera ilə skan
+let reader = null, target = null;
+function extractImei(text) {
+  const m = String(text).match(/\d{15}/g) || [];
+  return m.find(luhn) || null;
+}
+async function openCam(t) {
+  target = t;
+  if (!window.ZXing) { toast("Skaner yüklənmədi, interneti yoxla"); return; }
+  $("#cam").classList.add("on");
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39, ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.DATA_MATRIX]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+  reader = new ZXing.BrowserMultiFormatReader(hints, 250);
+  try {
+    await reader.decodeFromConstraints({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } }, "vid", (res) => {
+      if (!res) return;
+      const imei = extractImei(res.getText());
+      if (imei) {
+        const el = $("#" + target); el.value = imei; checkImei(target);
+        if (navigator.vibrate) navigator.vibrate(80);
+        toast("IMEI oxundu: " + imei);
+        closeCam();
+      }
+    });
+  } catch (e) {
+    closeCam();
+    toast("Kameraya icazə verilmədi. Brauzer ayarlarından icazə ver.", 4000);
+  }
+}
+function closeCam() { $("#cam").classList.remove("on"); if (reader) { reader.reset(); reader = null; } }
+document.querySelectorAll(".scan[data-t]").forEach((b) => b.addEventListener("click", () => openCam(b.dataset.t)));
+$("#camClose").addEventListener("click", closeCam);
+
+// Telefon nömrəsi: +994 avtomatik
+function fmt994(raw) {
+  let d = String(raw).replace(/\D/g, "");
+  if (d.startsWith("994")) d = d.slice(3);
+  d = d.replace(/^0+/, "").slice(0, 9);
+  const parts = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean);
+  return "+994 " + parts.join(" ");
+}
+const nomreEl = $("#nomre");
+nomreEl.addEventListener("input", () => { nomreEl.value = fmt994(nomreEl.value); });
+nomreEl.addEventListener("focus", () => { if (!nomreEl.value) nomreEl.value = "+994 "; });
+
+// ===== Vəsiqə: kamera, avtomatik kəsmə =====
+const ID_W = 1012, ID_H = 638; // ID-1 kart ölçüsü nisbəti (85.6 × 54 mm)
+const idPhotos = { on: "", arxa: "" };
+let idSide = "on", idStream = null, cvPromise = null;
+function loadCv() {
+  if (cvPromise) return cvPromise;
+  cvPromise = new Promise((resolve) => {
+    const ready = () => window.cv && window.cv.Mat && window.cv.imread;
+    if (ready()) return resolve(true);
+    const s = document.createElement("script");
+    s.src = "https://docs.opencv.org/4.10.0/opencv.js"; s.async = true;
+    s.onerror = () => resolve(false);
+    s.onload = () => {
+      if (window.cv && typeof window.cv.then === "function" && !window.cv.Mat) {
+        window.cv.then((m) => { if (m && m.Mat) { window.cv = m; } });
+      }
+    };
+    document.head.append(s);
+    const t0 = Date.now();
+    const poll = setInterval(() => {
+      if (ready()) { clearInterval(poll); resolve(true); }
+      else if (Date.now() - t0 > 25000) { clearInterval(poll); resolve(false); }
+    }, 200);
+  });
+  return cvPromise;
+}
+let idMode = store.get("idMode", "qutu");
+function setIdMode(m) {
+  idMode = m; store.set("idMode", m);
+  $("#idcam").classList.toggle("qutu", m === "qutu");
+  document.querySelectorAll(".idmode button").forEach((b) => b.classList.toggle("on", b.dataset.m === m));
+  $("#idtxt").textContent = m === "qutu" ? "Qutunun arxasını vəsiqə ilə birlikdə çərçivəyə gətir" : "Vəsiqənin ön tərəfini çərçivəyə qoy";
+}
+document.querySelectorAll(".idmode button").forEach((b) => b.addEventListener("click", () => setIdMode(b.dataset.m)));
+async function openIdCam(side) {
+  idSide = side; loadCv(); setIdMode(idMode);
+  $("#idcam").classList.add("on");
+  try {
+    idStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 2560 }, height: { ideal: 1440 } }, audio: false });
+    const v = $("#idvid"); v.srcObject = idStream; await v.play();
+  } catch (e) { closeIdCam(); toast("Kameraya icazə verilmədi. Brauzer ayarlarından icazə ver.", 4000); }
+}
+function closeIdCam() { $("#idcam").classList.remove("on"); if (idStream) { idStream.getTracks().forEach((t) => t.stop()); idStream = null; } }
+// Ekrandakı çərçivənin videodakı yeri (object-fit: cover nəzərə alınır)
+function guideRect(v) {
+  const box = $("#idcam").getBoundingClientRect(), g = $("#idframe").getBoundingClientRect();
+  const sc = Math.max(box.width / v.videoWidth, box.height / v.videoHeight);
+  const ox = (v.videoWidth * sc - box.width) / 2, oy = (v.videoHeight * sc - box.height) / 2;
+  return { x: (g.left - box.left + ox) / sc, y: (g.top - box.top + oy) / sc, w: g.width / sc, h: g.height / sc };
+}
+function orderPts(p) {
+  const s = p.map((q) => q.x + q.y), d = p.map((q) => q.x - q.y);
+  return [p[s.indexOf(Math.min(...s))], p[d.indexOf(Math.max(...d))], p[s.indexOf(Math.max(...s))], p[d.indexOf(Math.min(...d))]];
+}
+function findCard(cv, src) {
+  const sc = 700 / Math.max(src.cols, src.rows);
+  const small = new cv.Mat(), gray = new cv.Mat(), edges = new cv.Mat();
+  cv.resize(src, small, new cv.Size(0, 0), sc, sc, cv.INTER_AREA);
+  cv.cvtColor(small, gray, cv.COLOR_RGBA2GRAY);
+  cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+  cv.Canny(gray, edges, 30, 110);
+  const k = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+  cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, k);
+  const cs = new cv.MatVector(), hi = new cv.Mat();
+  cv.findContours(edges, cs, hi, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+  let best = null, bestA = small.cols * small.rows * 0.25;
+  for (let i = 0; i < cs.size(); i++) {
+    const c = cs.get(i), a = cv.contourArea(c);
+    if (a > bestA) {
+      const hull = new cv.Mat(), ap = new cv.Mat();
+      cv.convexHull(c, hull);
+      cv.approxPolyDP(hull, ap, 0.03 * cv.arcLength(hull, true), true);
+      if (ap.rows === 4) {
+        bestA = a; best = [];
+        for (let j = 0; j < 4; j++) best.push({ x: ap.data32S[j * 2] / sc, y: ap.data32S[j * 2 + 1] / sc });
+      }
+      hull.delete(); ap.delete();
+    }
+    c.delete();
+  }
+  [small, gray, edges, k, cs, hi].forEach((m) => m.delete());
+  return best ? orderPts(best) : null;
+}
+function warpCard(cv, src, pts, out, mode) {
+  const [tl, tr, br, bl] = pts, dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const w = Math.max(dist(tl, tr), dist(bl, br)), h = Math.max(dist(tl, bl), dist(tr, br));
+  let W, H, rotate = false;
+  if (mode === "kart") { rotate = h > w; W = rotate ? ID_H : ID_W; H = rotate ? ID_W : ID_H; }
+  else { const k = 1400 / Math.max(w, h); W = Math.round(w * k); H = Math.round(h * k); } // qutunun öz nisbəti saxlanır
+  const sT = cv.matFromArray(4, 1, cv.CV_32FC2, [tl.x, tl.y, tr.x, tr.y, br.x, br.y, bl.x, bl.y]);
+  const dT = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, W, 0, W, H, 0, H]);
+  const M = cv.getPerspectiveTransform(sT, dT), dst = new cv.Mat();
+  cv.warpPerspective(src, dst, M, new cv.Size(W, H), cv.INTER_LINEAR, cv.BORDER_REPLICATE, new cv.Scalar());
+  const tmp = document.createElement("canvas"); cv.imshow(tmp, dst);
+  [sT, dT, M, dst].forEach((m) => m.delete());
+  const ctx = out.getContext("2d");
+  if (rotate) { out.width = ID_W; out.height = ID_H; ctx.translate(ID_W, 0); ctx.rotate(Math.PI / 2); }
+  else { out.width = W; out.height = H; }
+  ctx.drawImage(tmp, 0, 0);
+}
+// Şəkli emal edir: kənarları tapır, kəsir, nəticəni göstərir.
+// crop — axtarış sahəsi, g — tapılmasa istifadə olunan sahə (crop daxilində)
+async function processPhoto(crop, g, retryText) {
+  const out = $("#idout"); let found = false; const mode = idMode;
+  $("#ptitle").textContent = mode === "qutu" ? "Qutu + vəsiqə" : "Vəsiqə — ön tərəf";
+  $("#pnote").textContent = "Kənarlar axtarılır..."; $("#idprev").classList.add("on");
+  const fw = mode === "kart" ? ID_W : Math.round(1400 * g.w / Math.max(g.w, g.h)), fh = mode === "kart" ? ID_H : Math.round(1400 * g.h / Math.max(g.w, g.h));
+  out.width = fw; out.height = fh; out.getContext("2d").drawImage(crop, g.x, g.y, g.w, g.h, 0, 0, fw, fh);
+  const ok = await loadCv();
+  if (ok) {
+    try {
+      const cv = window.cv, src = cv.imread(crop);
+      const pts = findCard(cv, src);
+      if (pts) { warpCard(cv, src, pts, out, mode); found = true; }
+      src.delete();
+    } catch (e) { found = false; }
+  }
+  $("#pnote").textContent = found ? (mode === "qutu" ? "✓ Qutu və vəsiqə avtomatik kəsildi" : "✓ Vəsiqə avtomatik seçildi") : retryText;
+}
+async function shootId() {
+  const v = $("#idvid"); if (!v.videoWidth) return;
+  $("#idShot").disabled = true;
+  const g = guideRect(v);
+  // Çərçivədən bir az böyük sahə götürülür ki, kənarlar itməsin
+  const pad = 0.18, x = Math.max(0, g.x - g.w * pad), y = Math.max(0, g.y - g.h * pad);
+  const w = Math.min(v.videoWidth - x, g.w * (1 + 2 * pad)), h = Math.min(v.videoHeight - y, g.h * (1 + 2 * pad));
+  const crop = document.createElement("canvas"); crop.width = Math.round(w); crop.height = Math.round(h);
+  crop.getContext("2d").drawImage(v, x, y, w, h, 0, 0, crop.width, crop.height);
+  closeIdCam();
+  await processPhoto(crop, { x: g.x - x, y: g.y - y, w: g.w, h: g.h }, "Kənarlar tapılmadı, çərçivəyə görə kəsildi. Lazım olsa, yenidən çək.");
+  $("#idShot").disabled = false;
+}
+// Qalereyadan şəkil
+$("#idGal").addEventListener("click", () => $("#idFile").click());
+$("#idFile").addEventListener("change", async (e) => {
+  const file = e.target.files && e.target.files[0]; e.target.value = "";
+  if (!file) return;
+  closeIdCam();
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const k = Math.min(1, 2560 / Math.max(bmp.width, bmp.height));
+    const crop = document.createElement("canvas"); crop.width = Math.round(bmp.width * k); crop.height = Math.round(bmp.height * k);
+    crop.getContext("2d").drawImage(bmp, 0, 0, crop.width, crop.height);
+    let g = { x: 0, y: 0, w: crop.width, h: crop.height };
+    if (idMode === "kart") { // tapılmasa ortadan vəsiqə nisbətində kəs
+      const r = ID_W / ID_H; let w = crop.width, h = w / r; if (h > crop.height) { h = crop.height; w = h * r; }
+      g = { x: (crop.width - w) / 2, y: (crop.height - h) / 2, w, h };
+    }
+    await processPhoto(crop, g, "Kənarlar tapılmadı, şəkil olduğu kimi götürüldü.");
+  } catch (err) { toast("Şəkil açılmadı, başqa şəkil seç"); }
+});
+document.querySelectorAll(".idslot").forEach((b) => b.addEventListener("click", () => openIdCam(b.dataset.side)));
+$("#idClose").addEventListener("click", closeIdCam);
+$("#idShot").addEventListener("click", shootId);
+$("#idRetry").addEventListener("click", () => { $("#idprev").classList.remove("on"); openIdCam(idSide); });
+$("#idOk").addEventListener("click", () => {
+  idPhotos[idSide] = $("#idout").toDataURL("image/jpeg", 0.85);
+  const slot = document.querySelector(`.idslot[data-side="${idSide}"]`);
+  slot.querySelector("img").src = idPhotos[idSide]; slot.classList.add("has");
+  $("#idprev").classList.remove("on"); toast("Vəsiqə şəkli əlavə olundu");
+  readPhoto(idPhotos[idSide]);
+});
+// ===== Şəkildən oxunan mətni xanalara ayırmaq =====
+function luhnOk(s) {
+  if (!/^\d{15}$/.test(s)) return false;
+  let sum = 0;
+  for (let i = 0; i < 15; i++) { let d = +s[i]; if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; } sum += d; }
+  return sum % 10 === 0;
+}
+const AZ_UP = (s) => s.toLocaleUpperCase("az");
+function titleAz(s) {
+  return s.toLocaleLowerCase("az").replace(/(^|[\s-])(\S)/g, (m, a, b) => a + b.toLocaleUpperCase("az"));
+}
+function parseOcr(raw) {
+  const res = {};
+  const text = String(raw || "").replace(/\r/g, "");
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  // IMEI: rəqəm yerində səhv oxunan hərfləri düzəlt, 15 rəqəmli və Luhn-dan keçənləri götür
+  const imeis = [];
+  const fixDigits = (s) => s.replace(/[Oo]/g, "0").replace(/[Il|]/g, "1").replace(/[Ss](?=\d)/g, "5").replace(/B(?=\d)/g, "8");
+  const scan = (s) => {
+    const runs = s.match(/\d[\d\s]{13,22}\d/g) || [];
+    runs.forEach((r) => {
+      const d = r.replace(/\s/g, "");
+      for (let i = 0; i + 15 <= d.length; i++) {
+        const c = d.slice(i, i + 15);
+        if (luhnOk(c) && !imeis.includes(c)) { imeis.push(c); break; }
+      }
+    });
+  };
+  lines.filter((l) => /IMEI|MEID/i.test(l)).forEach((l) => scan(fixDigits(l.replace(/.*?(IMEI|MEID)\s*\d?\s*[:/]?/i, ""))));
+  scan(text);
+  if (imeis[0]) res.imei1 = imeis[0];
+  if (imeis[1]) res.imei2 = imeis[1];
+  // Model
+  const BR = /(iPhone|iPad|Galaxy|Redmi|Xiaomi|POCO|Honor|HUAWEI|Pixel|Infinix|TECNO|realme|vivo|OPPO|OnePlus|Nokia|Motorola|moto|Nothing Phone)/i;
+  const ml = lines.find((l) => BR.test(l) && !/IMEI|S\/N|Serial/i.test(l));
+  if (ml) {
+    let m = ml.slice(ml.search(BR)).replace(/\s+/g, " ").trim();
+    m = m.replace(/\b(Model|Модель)\b.*$/i, "").trim();
+    if (!/\d+\s?(GB|TB)/i.test(m)) {
+      const st = text.match(/\b(\d{2,4})\s?(GB|TB)\b/i);
+      if (st) m += " " + st[1] + st[2].toUpperCase();
+    }
+    res.mehsul = m.replace(/\s?(\d+)\s?(gb|tb)\b/i, (x, n, u) => " " + n + u.toUpperCase()).trim();
+  }
+  // Model kodu: Apple part nömrəsi (MFAB4LL/A), A-nömrəsi (A3524), Samsung (SM-S948B/DS)
+  const up = text.toUpperCase().replace(/\s*\/\s*A\b/g, "/A").replace(/\b([MN][A-Z0-9]{4})\s+([A-Z]{1,3}\/A)\b/g, "$1$2");
+  const part = (up.match(/\b[MN][A-Z0-9]{4}[A-Z]{1,3}\/A\b/) || [])[0];
+  const anum = (up.match(/\bA[23]\d{3}\b/) || [])[0];
+  const sm = (up.match(/\bSM-[A-Z]\d{3,4}[A-Z0-9]{0,3}(\/DS)?\b/) || [])[0];
+  const kod = [part, anum, sm].filter(Boolean).join(" · ");
+  if (kod) res.modelkod = kod;
+  // FİN: 7 simvol, böyük hərf + rəqəm
+  const finRe = /\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{7}\b/;
+  let fin = null;
+  for (let i = 0; i < lines.length && !fin; i++) {
+    if (/F[İI]N|PIN|Personal\s*No/i.test(lines[i])) {
+      const after = AZ_UP(lines[i].replace(/.*?(F[İI]N|PIN|Personal\s*No\.?)\s*(kod[u]?)?\s*[:/.]?/i, "")).replace(/İ/g, "I");
+      const cand = (after.match(finRe) || (lines[i + 1] && AZ_UP(lines[i + 1]).replace(/İ/g, "I").match(finRe)) || [])[0];
+      if (cand) fin = cand;
+    }
+  }
+  if (!fin) {
+    const all = text.replace(/İ/g, "I").match(new RegExp(finRe.source, "g")) || [];
+    fin = all.find((c) => !imeis.some((x) => x.includes(c)) && !/GB$|TB$/.test(c)) || null;
+  }
+  if (fin) res.fin = fin.replace(/O/g, "0");
+  // Ad və soyad (vəsiqədəki "Soyadı / Surname", "Adı / Given name" sətirləri)
+  const isLabel = (l) => /soyad|surname|ad[ıi]\b|given|name|ata|patronym|doğum|birth|cins|sex|vətəndaş|nationality|tarix|date|f[iİ]n|seriya|şəxsiyyət|vəsiqə|identity|respublika|republic/i.test(l);
+  const valueAfter = (re) => {
+    for (let i = 0; i < lines.length; i++) {
+      if (re.test(lines[i])) {
+        const L = lines[i];
+        const same = (L.includes(":") ? L.slice(L.lastIndexOf(":") + 1) : L.replace(/(soyad[ıi]?|surname|given\s*names?|ad[ıi]|name|\/)/gi, "")).trim();
+        if (same && !isLabel(same) && /^[A-Za-zƏəÖöÜüĞğÇçŞşİıI\s-]{2,}$/.test(same)) return same;
+        for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+          if (!isLabel(lines[j]) && /^[A-Za-zƏəÖöÜüĞğÇçŞşİıI\s-]{2,}$/.test(lines[j])) return lines[j];
+        }
+      }
+    }
+    return null;
+  };
+  const sur = valueAfter(/soyad|surname/i);
+  const giv = valueAfter(/^(?!.*(soyad|surname|ata|patronym)).*(\bad[ıi]\b|given)/i);
+  if (giv || sur) res.ad = titleAz([giv, sur].filter(Boolean).join(" ").trim());
+  return res;
+}
+
+// Apple part nömrəsinin sonundakı region kodu (məs. MFAB4LL/A → LL = ABŞ)
+const REGION = { LL: "ABŞ", J: "Yaponiya", C: "Kanada", VC: "Kanada", CL: "Kanada", AE: "BƏƏ / Körfəz", AB: "Körfəz ölkələri", AH: "Körfəz ölkələri", CH: "Çin", ZA: "Sinqapur", ZP: "Honkonq", HN: "Hindistan", B: "Böyük Britaniya", ZD: "Avropa", QL: "Avropa", QN: "Avropa", RU: "Rusiya", TU: "Türkiyə", KH: "Koreya", X: "Avstraliya", LZ: "Latın Amerikası", AA: "Asiya" };
+const ESIM_ONLY_17 = ["J", "C", "VC", "CL", "AE", "AB", "AH"]; // 17 Pro / 18 Pro və sonrakılar üçün yalnız eSIM olan regionlar
+function simFor(kod, mehsul) {
+  const m = /([A-Z]{1,3})\/A\b/.exec(kod || ""); if (!m) return null;
+  const rc = m[1].slice(-2) in REGION ? m[1].slice(-2) : m[1].slice(-1) in REGION ? m[1].slice(-1) : m[1];
+  const reg = REGION[rc] || REGION[m[1]] || null;
+  const iph = /iPhone\s*(\d{2})\s*(Pro|Air|Duo)?/i.exec(mehsul || "");
+  const gen = iph ? +iph[1] : 0, proAir = iph && iph[2];
+  let sim = "Nano SIM + eSIM";
+  if (/Air/i.test(mehsul || "")) sim = "Yalnız eSIM";
+  else if (rc === "LL" && gen >= 14) sim = "Yalnız eSIM";
+  else if (ESIM_ONLY_17.includes(rc) && gen >= 17 && proAir) sim = "Yalnız eSIM";
+  else if (rc === "CH") sim = "2 nano SIM";
+  return { sim, reg };
+}
+function updateSim() {
+  const r = simFor(AZ_UP($("#modelkod").value), $("[name=mehsul]").value), h = $("#h_sim");
+  if (!r) { h.textContent = ""; return; }
+  $("#sim").value = r.sim;
+  h.className = "hint " + (r.sim === "Yalnız eSIM" ? "bad" : "ok");
+  h.textContent = (r.reg ? r.reg + " modeli — " : "") + r.sim + (r.sim === "Yalnız eSIM" ? " (SIM kart yeri yoxdur)" : "");
+}
+$("#modelkod").addEventListener("input", updateSim);
+$("[name=mehsul]").addEventListener("input", updateSim);
+
+async function readPhoto(photo) {
+  const h = $("#h_ocr");
+  if (!set.url) { h.className = "hint bad"; h.textContent = "Avtomatik doldurma üçün Ayarlarda Sheets linki lazımdır"; return; }
+  h.className = "hint"; h.textContent = "⏳ Şəkildəki məlumatlar oxunur...";
+  try {
+    const body = new URLSearchParams({ acar: set.key, emr: "ocr", sekil: photo.split(",")[1] });
+    const r = await fetch(set.url, { method: "POST", body });
+    const j = JSON.parse(await r.text());
+    if (!j.ok) throw new Error(j.xeta || "oxunmadı");
+    const f = parseOcr(j.metn);
+    const map = { mehsul: "[name=mehsul]", modelkod: "#modelkod", imei1: "#imei1", imei2: "#imei2", ad: "[name=ad]", fin: "[name=fin]" };
+    const filled = [];
+    Object.entries(map).forEach(([k, sel]) => {
+      const el = $(sel);
+      if (f[k] && !el.value.trim()) { el.value = f[k]; el.classList.add("auto"); filled.push(k); }
+    });
+    ["imei1", "imei2"].forEach(checkImei); updateSim();
+    if (f.modelkod && /\/DS\b/.test(f.modelkod)) $("#sim").value = "2 nano SIM";
+    const names = { modelkod: "model kodu", mehsul: "model", imei1: "IMEI 1", imei2: "IMEI 2", ad: "ad", fin: "FİN" };
+    if (filled.length) { h.className = "hint ok"; h.textContent = "✓ Dolduruldu: " + filled.map((k) => names[k]).join(", ") + " — sarı xanaları yoxla"; }
+    else { h.className = "hint bad"; h.textContent = "Şəkildən məlumat oxunmadı. Xanaları əllə doldur və ya daha aydın çək."; }
+  } catch (e) { h.className = "hint bad"; h.textContent = "Avtomatik oxuma alınmadı, xanaları əllə doldur."; }
+}
+document.addEventListener("input", (e) => { if (e.target.classList && e.target.classList.contains("auto")) e.target.classList.remove("auto"); });
+function clearIds() {
+  idPhotos.on = ""; idPhotos.arxa = "";
+  document.querySelectorAll(".idslot").forEach((s) => { s.classList.remove("has"); s.querySelector("img").removeAttribute("src"); });
+}
+
+// Ayarlar
+const set = Object.assign({ url: "", key: "", wa: "", waOn: true, waFin: false }, store.get("ayarlar", {}));
+$("#url").value = set.url; $("#key").value = set.key;
+$("#wa").value = set.wa; $("#waOn").checked = set.waOn; $("#waFin").checked = set.waFin;
+if (!set.url) $("#settings").style.display = "block";
+$("#gearBtn").addEventListener("click", () => { const s = $("#settings"); s.style.display = s.style.display === "block" ? "none" : "block"; });
+$("#saveSet").addEventListener("click", () => {
+  set.url = $("#url").value.trim(); set.key = $("#key").value.trim();
+  set.wa = $("#wa").value.replace(/\D/g, ""); set.waOn = $("#waOn").checked; set.waFin = $("#waFin").checked;
+  store.set("ayarlar", set); $("#settings").style.display = "none"; toast("Ayarlar saxlandı");
+});
+
+// İşçilər: ad seçiləndə nömrə avtomatik düşür.
+// Yeni işçi üçün buraya bir sətir əlavə et: { ad: "Ad", nomre: "0xx-xxx-xx-xx" },
+const ISCILER = [
+  { ad: "Elvin", nomre: "077-383-22-52" },
+  { ad: "Şahmar", nomre: "051-337-18-18" },
+];
+function drawIsc() {
+  const sel = $("#satSec"), cur = sel.value || store.get("sonSatici", "");
+  sel.innerHTML = '<option value="">Seç...</option>';
+  ISCILER.forEach((x) => { const o = document.createElement("option"); o.value = x.ad; o.textContent = x.ad; sel.append(o); });
+  if (ISCILER.some((x) => x.ad === cur)) sel.value = cur;
+  fillNom();
+}
+function fillNom() {
+  const x = ISCILER.find((y) => y.ad === $("#satSec").value);
+  $("#satNom").value = x ? fmt994(x.nomre) : "";
+}
+$("#satSec").addEventListener("change", () => { fillNom(); store.set("sonSatici", $("#satSec").value); });
+drawIsc();
+
+// Tarixçə (yalnız ad və məhsul, şəxsi məlumat saxlanmır)
+function renderHist() {
+  const h = store.get("tarixce", []);
+  $("#hist").innerHTML = "";
+  if (!h.length) { $("#hist").innerHTML = "<small>Hələ heç nə yoxdur</small>"; return; }
+  h.slice(0, 8).forEach((r) => {
+    const d = document.createElement("div");
+    const left = document.createElement("span"); left.textContent = r.ad + " — " + r.mehsul;
+    const st = document.createElement("span"); st.className = "state" + (r.ok ? "" : " err"); st.textContent = r.ok ? r.vaxt : "göndərilmədi";
+    d.append(left, st); $("#hist").append(d);
+  });
+}
+renderHist();
+
+// Borc bölməsi
+function toggleBorc() {
+  const on = $("#borcVar").checked;
+  $("#borcSah").style.display = on ? "block" : "none";
+  $("#borc").required = on;
+}
+$("#borcVar").addEventListener("change", toggleBorc);
+function calcBorc() {
+  const q = parseFloat(($("[name=qiymet]").value || "").replace(",", "."));
+  const o = parseFloat(($("#odenen").value || "").replace(",", "."));
+  if (!isNaN(q) && !isNaN(o) && o <= q) $("#borc").value = +(q - o).toFixed(2);
+}
+$("#odenen").addEventListener("input", calcBorc);
+$("[name=qiymet]").addEventListener("input", () => { if ($("#borcVar").checked) calcBorc(); });
+// Azərbaycanca təqvim
+const AYLAR = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "İyun", "İyul", "Avqust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"];
+const GUNLER = ["B.e", "Ç.a", "Ç", "C.a", "C", "Ş", "B"];
+const iso = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+let calY, calM;
+function setBorcDate(d) {
+  $("#borctarix").value = d ? iso(d) : "";
+  $("#borcGoster").value = d ? azDate(iso(d)) : "";
+  $("#borctarix").dispatchEvent(new Event("change"));
+}
+function drawCal() {
+  const c = $("#cal"); c.innerHTML = "";
+  const top = document.createElement("div"); top.className = "top";
+  const prev = document.createElement("button"); prev.type = "button"; prev.textContent = "‹";
+  const next = document.createElement("button"); next.type = "button"; next.textContent = "›";
+  const t = document.createElement("span"); t.textContent = AYLAR[calM] + " " + calY;
+  prev.onclick = () => { calM--; if (calM < 0) { calM = 11; calY--; } drawCal(); };
+  next.onclick = () => { calM++; if (calM > 11) { calM = 0; calY++; } drawCal(); };
+  top.append(prev, t, next); c.append(top);
+  const g = document.createElement("div"); g.className = "grid";
+  GUNLER.forEach((w) => { const e = document.createElement("div"); e.className = "wd"; e.textContent = w; g.append(e); });
+  const first = (new Date(calY, calM, 1).getDay() + 6) % 7;
+  const nd = new Date(calY, calM + 1, 0).getDate();
+  const today = iso(new Date()), sel = $("#borctarix").value;
+  for (let i = 0; i < first; i++) g.append(document.createElement("div"));
+  for (let d = 1; d <= nd; d++) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "d"; b.textContent = d;
+    const v = iso(new Date(calY, calM, d));
+    if (v === today) b.classList.add("today");
+    if (v === sel) b.classList.add("sel");
+    if (v < today) b.classList.add("past");
+    b.onclick = () => { setBorcDate(new Date(calY, calM, d)); c.classList.remove("on"); };
+    g.append(b);
+  }
+  c.append(g);
+}
+$("#borcGoster").addEventListener("click", () => {
+  const c = $("#cal"); const base = $("#borctarix").value ? new Date($("#borctarix").value + "T00:00") : new Date();
+  calY = base.getFullYear(); calM = base.getMonth(); drawCal(); c.classList.toggle("on");
+});
+document.querySelectorAll(".quick button").forEach((b) => b.addEventListener("click", () => {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  if (b.dataset.d) d.setDate(d.getDate() + +b.dataset.d); else d.setMonth(d.getMonth() + +b.dataset.m);
+  setBorcDate(d); $("#cal").classList.remove("on");
+}));
+$("#borctarix").addEventListener("change", () => {
+  const v = $("#borctarix").value, h = $("#h_borc");
+  if (!v) { h.textContent = ""; return; }
+  const days = Math.round((new Date(v + "T00:00") - new Date(new Date().toDateString())) / 86400000);
+  h.className = "hint " + (days < 0 ? "bad" : "ok");
+  h.textContent = days < 0 ? "Bu tarix keçib" : days === 0 ? "Bu gün" : days + " gün sonra";
+});
+function azDate(v) { if (!v) return ""; const [y, m, d] = v.split("-"); return +d + " " + AYLAR[+m - 1].toLocaleLowerCase("az") + " " + y; }
+
+// WhatsApp mesajı
+function waMessage(d) {
+  const v = (k) => (d.get(k) || "").toString().trim();
+  const now = new Date();
+  const L = [];
+  L.push("*👤 Müştəri*", "Ad, soyad: " + v("ad"), "Mobil nömrə: " + v("nomre"));
+  if (set.waFin && v("fin")) L.push("FİN: " + v("fin"));
+  L.push("", "*📱 Məhsul*", "Model: " + v("mehsul"));
+  if (v("modelkod")) L.push("Model kodu: " + AZ_UP(v("modelkod")));
+  if (v("sim")) L.push("SIM: " + v("sim"));
+  L.push("IMEI 1: " + v("imei1"));
+  if (v("imei2")) L.push("IMEI 2: " + v("imei2"));
+  L.push("", "*💳 Ödəniş*", "Növ: " + v("odenis"));
+  if (v("muddet") && v("muddet") !== "—") L.push("Müddət: " + v("muddet") + " ay");
+  if (v("qiymet")) L.push("Qiymət: " + v("qiymet") + " ₼");
+  if (v("borcvar")) {
+    L.push("", "*⚠️ BORC*");
+    if (v("odenen")) L.push("Ödədiyi: " + v("odenen") + " ₼");
+    L.push("Qalan borc: *" + v("borc") + " ₼*", "Ödəmə tarixi: *" + azDate(v("borctarix")) + "*");
+    if (v("borcqeyd")) L.push("Qeyd: " + v("borcqeyd"));
+  }
+  if (v("qeyd")) L.push("", "📝 " + v("qeyd"));
+  if (v("satici")) L.push("", "🧑‍💼 Satıcı: " + v("satici"));
+  return L.join("\n");
+}
+// Şəkilli göndərmə: vəsiqə şəkli + altında yazı (WhatsApp-da şəklin altındakı mətn kimi)
+let pendingShare = null;
+function dataUrlToFile(u, name) {
+  const [h, b] = u.split(","), bin = atob(b), arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new File([arr], name, { type: h.slice(5, h.indexOf(";")) });
+}
+async function sharePhoto() {
+  if (!pendingShare) return;
+  const { text, file } = pendingShare;
+  try { await navigator.clipboard.writeText(text); } catch (e) {}
+  try {
+    await navigator.share({ files: [file], text });
+    closeShare();
+  } catch (e) {
+    if (e && e.name === "AbortError") return; // istifadəçi ləğv etdi
+    toast("Şəkil paylaşılmadı, yalnız mətn göndərilir"); closeShare(); openWa(text);
+  }
+}
+function showShare(text, photo) {
+  const file = dataUrlToFile(photo, "vesiqe.jpg");
+  if (!(navigator.canShare && navigator.canShare({ files: [file] }))) { openWa(text); return; }
+  pendingShare = { text, file };
+  $("#shareImg").src = photo; $("#share").classList.add("on");
+}
+function closeShare() { pendingShare = null; $("#share").classList.remove("on"); }
+function openWa(text) {
+  const base = set.wa ? "https://wa.me/" + set.wa : "https://wa.me/";
+  window.location.href = base + "?text=" + encodeURIComponent(text);
+}
+
+$("#shareGo").addEventListener("click", sharePhoto);
+$("#shareNo").addEventListener("click", closeShare);
+
+// Göndərmə
+$("#f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!set.url) { $("#settings").style.display = "block"; toast("Əvvəlcə Ayarlarda Sheets linkini yaz"); return; }
+  if (!checkImei("imei1") || !checkImei("imei2")) { toast("IMEI-ni yoxla"); return; }
+  if (nomreEl.value.replace(/\D/g, "").length !== 12) { toast("Müştərinin nömrəsini tam yaz"); nomreEl.focus(); return; }
+  if ($("#borcVar").checked && !$("#borctarix").value) { toast("Borcun ödəmə tarixini seç"); $("#borcGoster").click(); return; }
+  const data = new FormData(e.target);
+  data.set("fin", (data.get("fin") || "").toUpperCase());
+  data.append("acar", set.key);
+  if (idPhotos.on) data.append("vesiqe_on", idPhotos.on.split(",")[1]);
+  const btn = $("#sub"); btn.disabled = true; btn.textContent = "Göndərilir...";
+  const rec = { ad: data.get("ad"), mehsul: data.get("mehsul"), vaxt: String(new Date().getHours()).padStart(2, "0") + ":" + String(new Date().getMinutes()).padStart(2, "0"), ok: false };
+  try {
+    await fetch(set.url, { method: "POST", mode: "no-cors", body: new URLSearchParams(data) });
+    rec.ok = true; toast("✓ Cədvələ göndərildi");
+    const msg = waMessage(data);
+    const photoKeep = idPhotos.on;
+    e.target.reset(); ["imei1", "imei2"].forEach(checkImei); toggleBorc(); setBorcDate(null); drawIsc(); nomreEl.value = "+994 "; $("#h_borc").textContent = ""; clearIds(); $("#h_ocr").textContent = ""; $("#h_sim").textContent = ""; document.querySelectorAll(".auto").forEach((x) => x.classList.remove("auto"));
+    const photo = photoKeep;
+    if (set.waOn) { if (photo) showShare(msg, photo); else setTimeout(() => openWa(msg), 600); }
+  } catch (err) { toast("Göndərilmədi. İnterneti yoxla və yenidən cəhd et.", 4000); }
+  const h = store.get("tarixce", []); h.unshift(rec); store.set("tarixce", h.slice(0, 30)); renderHist();
+  btn.disabled = false; btn.textContent = "Cədvələ göndər";
+});
+</script>
+</body>
+</html>
